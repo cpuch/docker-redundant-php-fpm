@@ -1,0 +1,7 @@
+version: "3"
+
+services:
+
+  php:
+    volumes:
+      - './development/datadriven-investment/:/var/www/datadriven-investment.com/wp-content'

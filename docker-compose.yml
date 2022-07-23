@@ -1,0 +1,89 @@
+version: "3.9"
+
+services:
+  ############## loadbalancer ################
+  loadbalancer:
+    image: 637345297332.dkr.ecr.eu-west-1.amazonaws.com/patch-loadbalancer:latest
+    build: loadbalancer
+    ports:
+      - '80:8080' # map container port to host for external access
+    links:
+      - http
+
+  fileserver:
+    image: 637345297332.dkr.ecr.eu-west-1.amazonaws.com/patch-fileserver:latest
+    build: fileserver
+    deploy:
+      # restart_policy:
+      #   condition: none
+    volumes:
+      - wp-core:/var/wordpress/
+
+  ############ DB server ###################
+  db:
+    image: mariadb
+    volumes:
+      - db-data:/var/lib/mysql
+
+    environment:
+      - MYSQL_ROOT_PASSWORD=aqwe123
+
+  # backup-db:
+  #   image: candyline/mysql-backup-cron
+  #   environment:
+  #     - MYSQL_ROOT_PASSWORD=aqwe123
+  #     - MYSQL_HOST=db
+  #     - BACKUP_DIR=/var/backups/
+  #     - DAILY_CLEANUP=1
+  #     - MAX_DAILY_BACKUP_FILES=30
+  #     - STORAGE_TYPE=s3
+  #     - REGION=eu-west-1c
+  #     - ACCESS_KEY=
+  #     - SECRET_KEY=
+  #     - BUCKET=s3://sqlbackup.patch.dk/
+
+  # backup-files:
+  #   image: istepanov/backup-to-s3
+  #   environment:
+  #     - ACCESS_KEY=
+  #     - SECRET_KEY=
+  #     - S3_PATH=s3://sqlbackup.patch.dk/wp-content/
+  #     - DATA_PATH=/data/
+
+  #   volumes:
+  #     - season-of-mist-data:/data/broderi-info:ro
+
+  #################### WEBSITES ############
+  http:
+    image: 637345297332.dkr.ecr.eu-west-1.amazonaws.com/patch-httpd:latest
+    build: httpd
+    links:
+      - php
+    deploy:
+      replicas: 2
+
+    volumes:
+      - wp-core:/var/www/season-of-mist/:ro
+      - season-of-mist-data:/var/www/season-of-mist/wp-content:ro
+
+  php:
+    image: 637345297332.dkr.ecr.eu-west-1.amazonaws.com/patch-php-fpm:latest
+    build: php-fpm
+    deploy:
+      replicas: 2
+    links:
+      - db
+      - redis
+
+    volumes:
+      - wp-core:/var/www/season-of-mist/:ro
+      - season-of-mist-data:/var/www/season-of-mist/wp-content # write allowed
+
+  redis:
+    image: redis:4.0.8-alpine
+
+############## Data persisted on host #######
+volumes:
+  db-data: # database files
+  wp-core: # wordpress core
+  season-of-mist-data: # wordpress modules / themes
